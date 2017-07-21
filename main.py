@@ -1,7 +1,7 @@
 import flask
 import json
-import random
 import rethinkdb as r
+import uuid
 
 r.connect('localhost', 28015).repl()
 app = flask.Flask(__name__)
@@ -27,7 +27,7 @@ def new_transaction():
   if not request: return(error_msg(request, 'Request cannot be empty'))
   if not "bot" and "user" and "server" and "type" and "third-party" and "amount" and "reason" in request or "" in request.values(): return(error_msg(request, "Invalid request format"))
   if request['amount'] <= 0: return(error_msg(request, "Amount must be greater than 0"))
-  request.update({'id': random.randint(1, 999999)})
+  request.update({'id': uuid.uuid1().int>>64})
   return make_response(request)
 
 if __name__ == '__main__':

@@ -1,7 +1,9 @@
 import flask
 import json
 import random
+import rethinkdb as r
 
+r.connect('localhost', 28015).repl()
 app = flask.Flask(__name__)
 
 def error_msg(request, message, jsonify=True):

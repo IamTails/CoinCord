@@ -102,6 +102,21 @@ def make_embed(request):
   embed = {"title": "New transaction", "fields": fields}
   return embed
 
+def get_transactions(request):
+  transactions = []
+  if "type" in request:
+    transactions.append(list(r.table('transactions').filter(r.row['type'] == request['type']).run()))
+  if "amount" in request:
+    transactions.append(list(r.table('transactions').filter(r.row['amount'] == request['amount']).run()))
+  if "bot" in request:
+    transactions.append(list(r.table('transactions').filter(r.row['bot'] == request['bot']).run()))
+  if "user" in request:
+    transactions.append(list(r.table('transactions').filter(r.row['user'] == request['user']).run()))
+  if "reason" in request:
+    transactions.append(list(r.table('transactions').filter(r.row['reason'] == request['reason']).run()))
+  transactions = list(set(transactions))
+  return transactions[:request['limit']]
+
 
 @app.route('/api/new_transaction', methods=['POST'])
 def new_transaction():
@@ -204,9 +219,8 @@ def create_admin_token():
 @app.route('/api/admin/transactions')
 def show_transactions():
   """
-  Returns all transactions (need to make it limit soon rather than sending all)
-
-  planned: (keys in parentheses are optional)
+  Returns all transactions that match the given parameters
+  (keys in parentheses are optional)
   {
     "limit": 20,
     ("type": "deposit",)
@@ -228,7 +242,8 @@ def show_transactions():
   request = flask.request.get_json()
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
-  return flask.jsonify(list(r.table('transactions').run(conn)))
+  transactions = get_transactions(request)
+  return flask.jsonify(transactions)
 
 @app.route('/api/admin/fake_transaction', methods=['POST'])
 def fake_transaction():

@@ -62,6 +62,9 @@ def setup_db():
 
 
 def error_msg(request, message, jsonify=True):
+  """
+  creates an error message with the given request and message
+  """
   try:
     output = {"status": "error", "error": message,
               "type": request['type'], "amount": request['amount'], "user": request['user']}
@@ -73,15 +76,52 @@ def error_msg(request, message, jsonify=True):
 
 
 def make_response(request, jsonify=True):
+  """
+  creates success response with the given request
+  """
   output = {"id": request['id'], "status": "success", "type": request['type'],
             "amount": request['amount'], "user": request['user']}
   if jsonify:
     return flask.jsonify(output)
   return output
 
+def make_embed(request):
+  """
+  create an embed for logging transactions
+  """
+  fields = []
+  fields.append(
+      {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
+  fields.append(
+      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim'] ({request['bot']['_id']})}"})
+  fields.append({"name": "Type", "value": request['type']})
+  fields.append({"name": "Amount", "value": request['amount']})
+  fields.append({"name": "Reason", "value": request['reason']})
+  embed = {"title": "New transaction", "fields": fields}
+  return embed
+
 
 @app.route('/api/new_transaction', methods=['POST'])
 def new_transaction():
+  """
+  main endpoint, used by bots to start transactions
+
+  {
+    "type": "deposit",
+    "amount": 200,
+    "user": {
+      "name": "Mr Boo Grande",
+      "discrim": "6644",
+      "_id": "209137943661641728"
+    },
+    "bot": {
+      "name": "Alpha Bot",
+      "discrim": "4112",
+      "_id": "331841835733614603"
+    },
+    "reason": "casino"
+  }
+  """
   raw_request = flask.request
   request = flask.request.get_json()
   try:
@@ -105,26 +145,26 @@ def new_transaction():
   r.table('transactions').insert({"transaction": dict(
       make_response(request, jsonify=False))}).run(conn)
 
-  fields = []
-  fields.append(
-      {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
-  fields.append(
-      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim'] ({request['bot']['_id']})}"})
-  fields.append({"name": "Type", "value": request['type']})
-  fields.append({"name": "Amount", "value": request['amount']})
-  fields.append({"name": "Reason", "value": request['reason']})
-  embed = {"title": "New transaction", "fields": fields}
   requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                json={"embeds": [embed]})
+                json={"embeds": [make_embed(request)]})
 
   return make_response(request)
 
 
 @app.route('/api/admin/new_token', methods=['POST'])
 def create_token():
+  """
+  register a new bot, and return the token
+
+  "bot": {
+    "name": "Alpha Bot",
+    "discrim": "4112",
+    "_id": "331841835733614603"
+  }
+  """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in list(r.table('tokens').run(conn)):
+  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
   token = tokengenerator.URandomTokenGenerator().generate()
   bot = {"name": request['bot']['name'], "discrim": request['bot']['discrim'],
@@ -133,12 +173,15 @@ def create_token():
   return flask.jsonify(bot)
 
 
-@app.route('/api/admin/new_admin_token')
+@app.route('/api/admin/new_admin_token', methods=['GET'])
 def create_admin_token():
+  """
+  create a new admin token (for /api/admin/ endpoints)
+  """
   raw_request = flask.request
   request = flask.request.get_json()
   try:
-    if not raw_request.headers['Authorization'].split()[1] in list(r.table('tokens').run(conn)):
+    if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
       return error_msg(request, "Invalid token")
   except KeyError:
     return error_msg(request, "Invalid token")
@@ -149,32 +192,99 @@ def create_admin_token():
 
 @app.route('/api/admin/transactions')
 def show_transactions():
-  raw_request = flask.request
-  request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in list(r.table('tokens').run(conn)):
-    return error_msg(request, "Invalid token")
-  return flask.jsonify(list(r.table('transactions').run()))
+  """
+  Returns all transactions (need to make it limit soon rather than sending all)
 
-@app.route('/api/admin/fake_transaction', methods=['POST'])
-def fake_transaction():
+  planned: (keys in parentheses are optional)
+  {
+    "limit": 20,
+    ("type": "deposit",)
+    ("amount": 200,)
+    ("user": {
+      "name": "Mr Boo Grande",
+      "discrim": "6644",
+      "_id": "209137943661641728"
+    },)
+    ("bot": {
+      "name": "Alpha Bot",
+      "discrim": "4112",
+      "_id": "331841835733614603"
+    },)
+    ("reason": "casino")
+  }
+  """
   raw_request = flask.request
   request = flask.request.get_json()
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    print(list(r.table('tokens').run(conn)))
-    print(raw_request.headers['Authorization'].split()[1])
     return error_msg(request, "Invalid token")
-  fields = []
-  fields.append(
-      {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
-  fields.append(
-      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim']} ({request['bot']['_id']})"})
-  fields.append({"name": "Type", "value": request['type']})
-  fields.append({"name": "Amount", "value": request['amount']})
-  fields.append({"name": "Reason", "value": request['reason']})
-  fields.append({"name":"ID", "value":request['_id']})
-  embed = {"title": "New transaction", "fields": fields}
+  return flask.jsonify(list(r.table('transactions').run(conn)))
+
+@app.route('/api/admin/fake_transaction', methods=['POST'])
+def fake_transaction():
+  """
+  create a fake transaction log (for testing purposes)
+
+  {
+    "_id": 90832,
+    "type": "deposit",
+    "amount": 200,
+    "user": {
+      "name": "Mr Boo Grande",
+      "discrim": "6644",
+      "_id": "209137943661641728"
+    },
+    "bot": {
+      "name": "Alpha Bot",
+      "discrim": "4112",
+      "_id": "331841835733614603"
+    },
+    "reason": "casino"
+  }
+  """
+  raw_request = flask.request
+  request = flask.request.get_json()
+  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+    return error_msg(request, "Invalid token")
   return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                json={"embeds": [embed]})
+                json={"embeds": [make_embed(request)]})
+
+@app.route('/api/admin/purge_transactions', methods=['POST'])
+def purge_transactions():
+  """
+  Revert all transactions from the given bot, upto (and including) the given transaction id
+
+  {
+    "bot": {
+      "name": "Alpha Bot",
+      "discrim": "4112",
+      "_id": "331841835733614603"
+    },
+    "_id": 90832
+  }
+  """
+  raw_request = flask.request
+  request = flask.request.get_json()
+  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+    return error_msg(request, "Invalid token")
+  all_transactions = list(r.table('transactions').filter(r.row['_id'] >= request['_id'] and r.row['bot']['_id'] == request['bot']['_id']).run())
+  if len(all_transactions) == 0:
+    return error_msg(request, "No transactions found")
+  return error_msg(request, "Not implemented yet")
+
+@app.route('/api/admin/delete_transaction', methods=['POST'])
+def delete_transaction():
+  """
+  Reverts a single given transaction
+
+  {
+    "_id": 90832
+  }
+  """
+  raw_request = flask.request
+  request = flask.request.get_json()
+  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+    return error_msg(request, "Invalid token")
+  return error_msg(request, "Not implemented yet")
 
 if __name__ == '__main__':
   setup_db()

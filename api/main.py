@@ -90,13 +90,15 @@ def make_embed(request):
   create an embed for logging transactions
   """
   fields = []
+  fields.append({"name": "ID", "value": request['_id']})
+  fields.append({"name": "Type", "value": request['type']})
+  fields.append({"name": "Amount", "value": request['amount']})
+  fields.append({"name": "Reason", "value": request['reason']})
+  fields.append({"name": "Balance", "value": request['balance']})
   fields.append(
       {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
   fields.append(
       {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim'] ({request['bot']['_id']})}"})
-  fields.append({"name": "Type", "value": request['type']})
-  fields.append({"name": "Amount", "value": request['amount']})
-  fields.append({"name": "Reason", "value": request['reason']})
   embed = {"title": "New transaction", "fields": fields}
   return embed
 
@@ -144,6 +146,15 @@ def new_transaction():
 
   r.table('transactions').insert({"transaction": dict(
       make_response(request, jsonify=False))}).run(conn)
+
+  if len(list(r.table('users').filter(r.row['_id'] == request['user']['_id']).run(conn))) == 0:
+    r.table('users').insert({"user": request['user'].update({"balance": 0})}).run(conn)
+  balance = int(list(r.table('users').filter(r.row['_id'] == request['user']['_id']).run(conn))[0])
+  if request['type'] == "deposit":
+    request['balance'] = balance + request['amount']
+  if request['type'] == "withdrawl":
+    request['balance'] = balance - request['amount']
+  r.table('users').filter(r.row['_id'] == request['user']['_id']).update({"balance": request['balance']})
 
   requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
                 json={"embeds": [make_embed(request)]})
@@ -246,7 +257,7 @@ def fake_transaction():
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
   return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                json={"embeds": [make_embed(request)]})
+                json={"embeds": [make_embed(request)]}).text
 
 @app.route('/api/admin/purge_transactions', methods=['POST'])
 def purge_transactions():

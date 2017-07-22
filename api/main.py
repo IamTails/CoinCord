@@ -2,6 +2,7 @@ import json
 import uuid
 
 import flask
+import requests
 import rethinkdb as r
 from oauth2 import tokengenerator
 
@@ -95,15 +96,31 @@ def new_transaction():
     return error_msg(request, "Invalid request format")
   if request['amount'] <= 0:
     return error_msg(request, "Amount must be greater than 0")
-  request.update({'id': uuid.uuid1().int >> 64})
 
   if request['type'] == "withdrawl" and list(r.table('users').filter(r.row['_id'] == request['user']['_id']))[0]['balance'] < request['amount']:
     return error_msg(request, "The specified user does not have the required funds.")
 
+  request.update({'id': uuid.uuid1().int >> 64})
+
+  r.table('transactions').insert({"transaction": dict(
+      make_response(request, jsonify=False))}).run(conn)
+
+  fields = []
+  fields.append(
+      {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
+  fields.append(
+      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim'] ({request['bot']['_id']})}"})
+  fields.append({"name": "Type", "value": request['type']})
+  fields.append({"name": "Amount", "value": request['amount']})
+  fields.append({"name": "Reason", "value": request['reason']})
+  embed = {"title": "New transaction", "fields": fields}
+  requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
+                json={"embeds": [embed]})
+
   return make_response(request)
 
 
-@app.route('/api/new_token', methods=['POST'])
+@app.route('/api/admin/new_token', methods=['POST'])
 def create_token():
   raw_request = flask.request
   request = flask.request.get_json()
@@ -116,7 +133,7 @@ def create_token():
   return flask.jsonify(bot)
 
 
-@app.route('/api/new_admin_token')
+@app.route('/api/admin/new_admin_token')
 def create_admin_token():
   raw_request = flask.request
   request = flask.request.get_json()
@@ -128,6 +145,15 @@ def create_admin_token():
   token = tokengenerator.URandomTokenGenerator().generate()
   r.table('tokens').insert({"token": token}).run(conn)
   return token
+
+
+@app.route('/api/admin/transactions')
+def show_transactions():
+  raw_request = flask.request
+  request = flask.request.get_json()
+  if not raw_request.headers['Authorization'].split()[1] in list(r.table('tokens').run(conn)):
+    return error_msg(request, "Invalid token")
+  return flask.jsonify(list(r.table('transactions').run()))
 
 
 if __name__ == '__main__':

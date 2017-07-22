@@ -336,21 +336,20 @@ def delete_transaction():
   request = flask.request.get_json()
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
-  return error_msg(request, "Not implemented yet")
   transaction = list(r.table('transactions').filter(
-      r.row['_id'] == request['_id']).run(conn))[0]
+      r.row['_id'] == request['_id']).run(conn))[0] # get transaction from id
   if transaction['type'] == "deposit":
-    new_balance = int(f"-{transaction['amount']}")
+    new_balance = int(f"-{transaction['amount']}") # add or subtract to balance based on type
   elif transaction['type'] == "withdrawl":
     new_balance = int(f"{transaction['amount']}")
   balance = int(list(r.table('users').filter(
-      r.row['_id'] == transaction['user']['_id']).run(conn)))
+      r.row['_id'] == transaction['user']['_id']).run(conn))) # get the user's current balance
   r.table('users').filter(r.row['_id'] == transaction['user']['_id']).update(
-      {"balance": balance + new_balance})
+      {"balance": balance + new_balance}) # change the user's balance
   r.table('transactions').filter(
-      r.row['_id'] == transaction['_id']).delete().run(conn)
+      r.row['_id'] == transaction['_id']).delete().run(conn) # delete the transaction
   return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                       json={"embeds": [make_embed(transaction, "Transaction Reverted")]}).text
+                       json={"embeds": [make_embed(transaction, "Transaction Reverted")]}).text # log that the transaction has been reverted
 
 
 if __name__ == '__main__':

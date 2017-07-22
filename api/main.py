@@ -155,6 +155,26 @@ def show_transactions():
     return error_msg(request, "Invalid token")
   return flask.jsonify(list(r.table('transactions').run()))
 
+@app.route('/api/admin/fake_transaction', methods=['POST'])
+def fake_transaction():
+  raw_request = flask.request
+  request = flask.request.get_json()
+  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+    print(list(r.table('tokens').run(conn)))
+    print(raw_request.headers['Authorization'].split()[1])
+    return error_msg(request, "Invalid token")
+  fields = []
+  fields.append(
+      {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
+  fields.append(
+      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim']} ({request['bot']['_id']})"})
+  fields.append({"name": "Type", "value": request['type']})
+  fields.append({"name": "Amount", "value": request['amount']})
+  fields.append({"name": "Reason", "value": request['reason']})
+  fields.append({"name":"ID", "value":request['_id']})
+  embed = {"title": "New transaction", "fields": fields}
+  return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
+                json={"embeds": [embed]})
 
 if __name__ == '__main__':
   setup_db()

@@ -1,0 +1,31 @@
+2017-07-23T11:24:13.908662029 0.289608s notice: Recursively removing directory /home/joseph/CoinCord/api/rethinkdb_data/tmp
+2017-07-23T11:24:13.951784049 0.332730s notice: Initializing directory /home/joseph/CoinCord/api/rethinkdb_data
+2017-07-23T11:24:13.951965639 0.332911s info: Creating a default database for your convenience. (This is because you ran 'rethinkdb' without 'create', 'serve', or '--join', and the directory '/home/joseph/CoinCord/api/rethinkdb_data' did not already exist or is empty.)
+2017-07-23T11:24:13.952173489 0.333119s notice: Running rethinkdb 2.3.5~0xenial (GCC 5.3.1)...
+2017-07-23T11:24:13.957744389 0.338693s notice: Running on Linux 4.8.0-58-generic x86_64
+2017-07-23T11:24:13.957853063 0.338798s notice: Loading data from directory /home/joseph/CoinCord/api/rethinkdb_data
+2017-07-23T11:24:14.376189349 0.757135s info: Automatically using cache size of 100 MB
+2017-07-23T11:24:14.376451677 0.757396s warn: Cache size is very low and may impact performance.
+2017-07-23T11:24:14.408816592 0.789762s notice: Listening for intracluster connections on port 29015
+2017-07-23T11:24:14.431832698 0.812778s notice: Listening for client driver connections on port 28015
+2017-07-23T11:24:14.432110670 0.813056s notice: Listening for administrative HTTP connections on port 8080
+2017-07-23T11:24:14.432123800 0.813069s notice: Listening on cluster addresses: 127.0.0.1, 127.0.1.1, ::1
+2017-07-23T11:24:14.432141401 0.813086s notice: Listening on driver addresses: 127.0.0.1, 127.0.1.1, ::1
+2017-07-23T11:24:14.432153413 0.813098s notice: Listening on http addresses: 127.0.0.1, 127.0.1.1, ::1
+2017-07-23T11:24:14.432169896 0.813115s notice: To fully expose RethinkDB on the network, bind to all addresses by running rethinkdb with the `--bind all` command line option.
+2017-07-23T11:24:14.432183027 0.813130s notice: Server ready, "Joseph_Laptop_usp" 210930cc-f490-4b8a-ba0e-3619e389a594
+2017-07-23T11:24:15.310020957 1.690969s notice: A newer version of the RethinkDB server is available: 2.3.6. You can read the changelog at <https://github.com/rethinkdb/rethinkdb/releases>.
+2017-07-23T11:24:33.554086035 19.935031s info: Table 14b9a2ef-f8e0-468b-8661-addfbc9900b7: Starting a new Raft election for term 1.
+2017-07-23T11:24:33.569184844 19.950130s info: Table 14b9a2ef-f8e0-468b-8661-addfbc9900b7: Added replica on this server.
+2017-07-23T11:24:33.685265984 20.066212s info: Table 14b9a2ef-f8e0-468b-8661-addfbc9900b7: This server is Raft leader for term 1. Latest log index is 0.
+2017-07-23T11:24:35.114026168 21.494971s info: Table 3cf0c95d-61e3-4a1e-8288-e10516a0acb7: Starting a new Raft election for term 1.
+2017-07-23T11:24:35.114784936 21.495730s info: Table 3cf0c95d-61e3-4a1e-8288-e10516a0acb7: Added replica on this server.
+2017-07-23T11:24:35.162908870 21.543854s info: Table 3cf0c95d-61e3-4a1e-8288-e10516a0acb7: This server is Raft leader for term 1. Latest log index is 0.
+2017-07-23T11:24:36.464994364 22.845940s info: Table d54c4b2f-b17d-4ac9-b490-48f4a7b126ea: Starting a new Raft election for term 1.
+2017-07-23T11:24:36.465429343 22.846375s info: Table d54c4b2f-b17d-4ac9-b490-48f4a7b126ea: Added replica on this server.
+2017-07-23T11:24:36.507675064 22.888620s info: Table d54c4b2f-b17d-4ac9-b490-48f4a7b126ea: This server is Raft leader for term 1. Latest log index is 0.
+2017-07-23T11:24:37.847222764 24.228169s info: Table 8aa5e7d0-bdf0-4f7a-8edc-58afa9d3f14a: Starting a new Raft election for term 1.
+2017-07-23T11:24:37.847498222 24.228444s info: Table 8aa5e7d0-bdf0-4f7a-8edc-58afa9d3f14a: Added replica on this server.
+2017-07-23T11:24:37.907840956 24.288786s info: Table 8aa5e7d0-bdf0-4f7a-8edc-58afa9d3f14a: This server is Raft leader for term 1. Latest log index is 0.
+2017-07-23T11:24:38.756875374 25.137821s info: Table 14b9a2ef-f8e0-468b-8661-addfbc9900b7: Configuration is changing.
+2017-07-23T11:24:38.857618045 25.238564s info: Table 8aa5e7d0-bdf0-4f7a-8edc-58afa9d3f14a: Configuration is changing.

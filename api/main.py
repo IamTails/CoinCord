@@ -90,8 +90,8 @@ def error_msg(request, message, jsonify=True):
   except (KeyError, TypeError) as e:
     output = {"status": "error", "error": message}
   if jsonify:
-    return flask.jsonify(output)
-  return output
+    return flask.jsonify(output),401
+  return output,401
 
 
 def make_response(request, jsonify=True):

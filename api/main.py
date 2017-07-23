@@ -4,6 +4,7 @@ import uuid
 import flask
 import requests
 import rethinkdb as r
+from datetime import datetime
 from oauth2 import tokengenerator
 
 app = flask.Flask(__name__)
@@ -79,8 +80,8 @@ def make_response(request, jsonify=True):
   """
   creates success response with the given request
   """
-  output = {"id": request['id'], "status": "success", "type": request['type'],
-            "amount": request['amount'], "user": request['user']}
+  output = {"_id": request['_id'], "status": "success", "type": request['type'],
+            "amount": request['amount'], "user": request['user'], "bot": request['bot'], "reason": request['reason']}
   if jsonify:
     return flask.jsonify(output)
   return output
@@ -92,17 +93,18 @@ def make_embed(request, message="New Transaction"):
   """
   fields = []
   fields.append({"name": "ID", "value": request['_id']})
-  fields.append({"name": "Type", "value": request['type']})
-  fields.append({"name": "Amount", "value": request['amount']})
+  if request['type'] == "deposit":
+    fields.append({"name": "Amount", "value": f"+{request['amount']}"})
+  elif request['type'] == "withdrawl":
+    fields.append({"name": "Amount", "value": f"-{request['amount']}"})
   fields.append({"name": "Reason", "value": request['reason']})
-  fields.append({"name": "Balance", "value": request['balance']})
+  fields.append({"name": "Balance", "value": request['user']['balance']})
   fields.append(
       {"name": "User", "value": f"{request['user']['name']}#{request['user']['discrim']} ({request['user']['_id']})"})
   fields.append(
-      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim'] ({request['bot']['_id']})}"})
-  embed = {"title": message, "fields": fields}
-  return embed
-
+      {"name": "Bot", "value": f"{request['bot']['name']}#{request['bot']['discrim']} ({request['bot']['_id']})"})
+  embed = {"title": message, "fields": fields, "timestamp":datetime.now().isoformat()}
+  test = requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp', json={"embeds": [embed]})
 
 def get_transactions(request):
   transactions = []
@@ -121,7 +123,13 @@ def get_transactions(request):
   if "reason" in request:
     transactions.append(list(r.table('transactions').filter(
         r.row['reason'] == request['reason']).run(conn)))
-  transactions = list(set(transactions))
+  if not "reason" or "user" or "bot" or "amount" or "type" in request:
+    transactions.append(list(r.table('transactions').run(conn)))
+  temp = []
+  for i in transactions:
+    if i not in temp:
+      temp.append(i)
+  transactions = temp
   return transactions[:request['limit']]
 
 
@@ -164,25 +172,25 @@ def new_transaction():
   if request['type'] == "withdrawl" and list(r.table('users').filter(r.row['_id'] == request['user']['_id']))[0]['balance'] < request['amount']:
     return error_msg(request, "The specified user does not have the required funds.")
 
-  request.update({'id': uuid.uuid1().int >> 64})
+  request.update({'_id': uuid.uuid1().int >> 64})
 
   r.table('transactions').insert({"transaction": dict(
       make_response(request, jsonify=False))}).run(conn)
-
-  if len(list(r.table('users').filter(r.row['_id'] == request['user']['_id']).run(conn))) == 0:
+  if len(list(r.table('users').filter(r.row['user']['_id'] == request['user']['_id']).run(conn))) == 0:
+    request['user'].update({"balance": 0})
     r.table('users').insert(
-        {"user": request['user'].update({"balance": 0})}).run(conn)
-  balance = int(list(r.table('users').filter(
-      r.row['_id'] == request['user']['_id']).run(conn))[0])
+        {"user": request['user']}).run(conn)
+  balance = int(list(r.table('users').filter(r.row['user']['_id'] == request['user']['_id']).run(conn))[0]['user']['balance'])
   if request['type'] == "deposit":
-    request['balance'] = balance + request['amount']
+    request['user']['balance'] = balance + request['amount']
   if request['type'] == "withdrawl":
-    request['balance'] = balance - request['amount']
-  r.table('users').filter(r.row['_id'] == request['user']['_id']).update(
-      {"balance": request['balance']})
+    request['user']['balance'] = balance - request['amount']
+  r.table('users').filter(r.row['user']['_id'] == request['user']['_id']).update(
+      {"balance": request['user']['balance']}).run(conn)
 
-  requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                json={"embeds": [make_embed(request)]})
+  print("You should be maing an embed")
+  make_embed(request)
+  print("Why aren't you?")
 
   return make_response(request)
 
@@ -226,7 +234,7 @@ def create_admin_token():
   return token
 
 
-@app.route('/api/admin/transactions')
+@app.route('/api/admin/transactions', methods=["POST"])
 def show_transactions():
   """
   Returns all transactions that match the given parameters
@@ -282,8 +290,8 @@ def fake_transaction():
   request = flask.request.get_json()
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
-  return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                       json={"embeds": [make_embed(request)]}).text
+  make_embed(request)
+  return flask.jsonify(request)
 
 
 @app.route('/api/admin/purge_transactions', methods=['POST'])
@@ -319,8 +327,8 @@ def purge_transactions():
         {"balance": balance + new_balance})
     r.table('transactions').filter(
         r.row['_id'] == transaction['_id']).delete().run(conn)
-    return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                         json={"embeds": [make_embed(transaction, "Transaction Reverted")]}).text
+    make_embed(transaction, "transaction reverted")
+  return flask.jsonify(request)
 
 
 @app.route('/api/admin/delete_transaction', methods=['POST'])
@@ -337,20 +345,20 @@ def delete_transaction():
   if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
     return error_msg(request, "Invalid token")
   transaction = list(r.table('transactions').filter(
-      r.row['_id'] == request['_id']).run(conn))[0] # get transaction from id
+      r.row['transaction']['_id'] == request['_id']).run(conn))[0]['transaction'] # get transaction from id
   if transaction['type'] == "deposit":
     new_balance = int(f"-{transaction['amount']}") # add or subtract to balance based on type
   elif transaction['type'] == "withdrawl":
     new_balance = int(f"{transaction['amount']}")
   balance = int(list(r.table('users').filter(
-      r.row['_id'] == transaction['user']['_id']).run(conn))) # get the user's current balance
-  r.table('users').filter(r.row['_id'] == transaction['user']['_id']).update(
+      r.row['user']['_id'] == transaction['user']['_id']).run(conn))[0]['user']['balance']) # get the user's current balance
+  r.table('users').filter(r.row['user']['_id'] == transaction['user']['_id']).update(
       {"balance": balance + new_balance}) # change the user's balance
   r.table('transactions').filter(
-      r.row['_id'] == transaction['_id']).delete().run(conn) # delete the transaction
-  return requests.post('https://canary.discordapp.com/api/webhooks/338371642277494786/vG8DJjpXC-NEXB4ZISo1r7QQ0Ras_RaqZbuhzjYOklKu70l73PmumdUCgBruypPv3fQp',
-                       json={"embeds": [make_embed(transaction, "Transaction Reverted")]}).text # log that the transaction has been reverted
-
+      r.row['transaction']['_id'] == transaction['_id']).delete().run(conn) # delete the transaction
+  transaction['user'].update({"balance": balance + new_balance})
+  make_embed(transaction, "Transaction reverted")
+  return flask.jsonify(transaction)
 
 if __name__ == '__main__':
   setup_db()

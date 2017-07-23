@@ -64,7 +64,6 @@ def setup_db():
     print(f"No admin tokens set, created new token {token}")
 
 
-def check_auth():
   
 
 def require_auth(f):

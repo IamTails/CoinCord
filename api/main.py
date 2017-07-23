@@ -6,8 +6,10 @@ import requests
 import rethinkdb as r
 from datetime import datetime
 from oauth2 import tokengenerator
+from functools import wraps
 
 app = flask.Flask(__name__)
+
 
 
 class Database:
@@ -61,6 +63,23 @@ def setup_db():
     r.table('tokens').insert({"token": token}).run(conn)
     print(f"No admin tokens set, created new token {token}")
 
+
+def check_auth():
+  
+
+def require_auth(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        raw_request = flask.request
+        request = flask.request.get_json()
+        try:
+            if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+              return error_msg(request, "Invalid token")
+        except KeyError:
+            return error_msg(request, "Invalid token")
+
+        return f(*args, **kwargs)
+    return wrapper
 
 def error_msg(request, message, jsonify=True):
   """
@@ -134,6 +153,7 @@ def get_transactions(request):
 
 
 @app.route('/api/new_transaction', methods=['POST'])
+@require_auth
 def new_transaction():
   """
   main endpoint, used by bots to start transactions
@@ -156,12 +176,6 @@ def new_transaction():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  try:
-    if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-      if not raw_request.headers['Authorization'].split()[1] == list(r.table('bots').filter(r.row['bot']['_id'] == request['bot']['_id']).run(conn))[0]['token']:
-        return error_msg(request, "Invalid token")
-  except KeyError:
-    return error_msg(request, "Invalid token")
   if not request:
     return error_msg(request, 'Request cannot be empty')
   if not "bot" and "user" and "server" and "type" and "third-party" and "amount" and "reason" in request or "" in request.values():
@@ -196,6 +210,7 @@ def new_transaction():
 
 
 @app.route('/api/admin/new_token', methods=['POST'])
+@require_auth
 def create_token():
   """
   register a new bot, and return the token
@@ -208,8 +223,7 @@ def create_token():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    return error_msg(request, "Invalid token")
+  
   token = tokengenerator.URandomTokenGenerator().generate()
   bot = {"name": request['bot']['name'], "discrim": request['bot']['discrim'],
          "_id": request['bot']['id'], "owner": request['owner'], "token": token}
@@ -218,6 +232,7 @@ def create_token():
 
 
 @app.route('/api/admin/new_admin_token', methods=['GET'])
+@require_auth
 def create_admin_token():
   """
   create a new admin token (for /api/admin/ endpoints)
@@ -235,6 +250,7 @@ def create_admin_token():
 
 
 @app.route('/api/admin/transactions', methods=["POST"])
+@require_auth
 def show_transactions():
   """
   Returns all transactions that match the given parameters
@@ -258,13 +274,12 @@ def show_transactions():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    return error_msg(request, "Invalid token")
   transactions = get_transactions(request)
   return flask.jsonify(transactions)
 
 
 @app.route('/api/admin/fake_transaction', methods=['POST'])
+@require_auth
 def fake_transaction():
   """
   create a fake transaction log (for testing purposes)
@@ -288,13 +303,12 @@ def fake_transaction():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    return error_msg(request, "Invalid token")
   make_embed(request)
   return flask.jsonify(request)
 
 
 @app.route('/api/admin/purge_transactions', methods=['POST'])
+@require_auth
 def purge_transactions():
   """
   Revert all transactions from the given bot, upto (and including) the given transaction id
@@ -310,8 +324,6 @@ def purge_transactions():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    return error_msg(request, "Invalid token")
   all_transactions = list(r.table('transactions').filter(
       r.row['_id'] >= request['_id'] and r.row['bot']['_id'] == request['bot']['_id']).run(conn))
   if len(all_transactions) == 0:
@@ -332,6 +344,7 @@ def purge_transactions():
 
 
 @app.route('/api/admin/delete_transaction', methods=['POST'])
+@require_auth
 def delete_transaction():
   """
   Reverts a single given transaction
@@ -342,8 +355,6 @@ def delete_transaction():
   """
   raw_request = flask.request
   request = flask.request.get_json()
-  if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
-    return error_msg(request, "Invalid token")
   transaction = list(r.table('transactions').filter(
       r.row['transaction']['_id'] == request['_id']).run(conn))[0]['transaction'] # get transaction from id
   if transaction['type'] == "deposit":

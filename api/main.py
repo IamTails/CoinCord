@@ -72,7 +72,7 @@ def require_auth(f):
         raw_request = flask.request
         request = flask.request.get_json()
         try:
-            if not raw_request.headers['Authorization'].split()[1] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
+            if not raw_request.headers['Authorization'].split()[0] in [token_list['token'] for token_list in list(r.table('tokens').run(conn))]:
               return error_msg(request, "Invalid token")
         except KeyError:
             return error_msg(request, "Invalid token")
